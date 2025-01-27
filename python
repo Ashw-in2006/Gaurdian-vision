@@ -1,0 +1,54 @@
+import torch
+import cv2
+import numpy as np
+import winsound  # For making beep sounds on Windows
+
+# Load YOLOv5 model
+model = torch.hub.load('ultralytics/yolov5', 'yolov5m')
+
+# Initialize webcam
+cap = cv2.VideoCapture(0)
+if not cap.isOpened():
+    print("Error: Unable to access the webcam.")
+    exit()
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to grab frame.")
+        break
+
+    # Convert BGR to RGB for YOLOv5
+    rgb_frame = frame[:, :, ::-1]
+
+    # Perform detection
+    results = model([rgb_frame])
+
+    # Loop through detections
+    for _, row in results.pandas().xyxy[0].iterrows():
+        confidence = row['confidence']
+        if confidence < 0.3:
+            continue
+
+        # Bounding box coordinates and label
+        x1, y1, x2, y2 = int(row['xmin']), int(row['ymin']), int(row['xmax']), int(row['ymax'])
+        cls = row['name']
+
+        # If a cellphone is detected, beep
+        if cls.lower() == "cell phone":  # Ensure lowercase for consistency
+            winsound.Beep(1000, 500)  # Beep sound at 1000 Hz for 500 ms
+
+        # Draw bounding box and label
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        cv2.putText(frame, f"{cls}: {confidence:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+    # Display the video feed with detections
+    cv2.imshow('YOLOv5 Live Detection', frame)
+
+    # Break the loop on 'q' key press
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release resources
+cap.release()
+cv2.destroyAllWindows()
